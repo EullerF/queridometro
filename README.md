@@ -1,5 +1,7 @@
 # 🌡️ Queridômetro – Google Classroom
 
+**Acesse a aplicação aqui:** [https://eullerf.github.io/queridometro/](https://eullerf.github.io/queridometro/)
+
 Uma aplicação web de avaliação de sentimentos (estilo "Termômetro") projetada para acompanhar o engajamento e as percepções dos alunos ao longo de um curso sobre o Google Classroom no SENAI.
 
 ## Objetivo
