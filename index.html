@@ -312,7 +312,7 @@ document.getElementById('alertClose').addEventListener('click', () => {
 // AUTENTICAÇÃO DO ADMIN
 // ============================================================
 let adminUser = null;
-const ADMIN_EMAILS = ['euler.ferreira19@gmail.com', 'euller.silva@docente.pr.senai.br','clara.ramos@docente.senai.br']; // Adicione os e-mails aqui
+const ADMIN_EMAILS = ['euler.ferreira19@gmail.com', 'euller.silva@docente.senai.br','clara.ramos@docente.senai.br']; // Adicione os e-mails aqui
 
 onAuthStateChanged(auth, (user) => {
   if (user && ADMIN_EMAILS.includes(user.email)) {
