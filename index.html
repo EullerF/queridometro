@@ -205,7 +205,10 @@
   </div>
 </div>
  
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
 const DAYS = [
   {
     key:'d1', tab:'Dia 1', badge:'DIA 1 – APRESENTAÇÃO',
@@ -258,20 +261,24 @@ const DAYS = [
 ];
 
 // ============================================================
+// CONFIGURAÇÃO DO FIREBASE (Realtime Database)
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyC43NcYJbTbBN-rAq5uWweoTGve8NDBtks",
+  authDomain: "pro-educador-classroom.firebaseapp.com",
+  databaseURL: "https://pro-educador-classroom-default-rtdb.firebaseio.com",
+  projectId: "pro-educador-classroom",
+  storageBucket: "pro-educador-classroom.firebasestorage.app",
+  messagingSenderId: "228601503676",
+  appId: "1:228601503676:web:8f5303209d95c1f89c55b9"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ============================================================
 // CONTROLE DE LIBERAÇÃO DOS DIAS (gatilho manual do professor)
 // ============================================================
-// COMO LIBERAR UM DIA:
-// Altere o valor para "true" no objeto LOCKS abaixo e salve/publique
-// o arquivo novamente (ex: commit no GitHub Pages, ou republicar
-// no Google Sites). Não há gravação automática nem fetch — é só
-// essa constante que define o que cada aluno vê ao abrir a página.
-//
-//   true  = dia liberado (aluno pode responder/ver resultados)
-//   false = dia bloqueado (aparece como "ainda não liberado")
-//
-// Exemplo: para liberar o Dia 2, troque "d2: false" por "d2: true"
-// e publique novamente.
-
 const LOCKS = {
   d1: true,
   d2: false,
@@ -279,56 +286,53 @@ const LOCKS = {
   d4: false
 };
 
-// garante que todos os dias do array DAYS existam em LOCKS,
-// mesmo que algum tenha sido esquecido na edição manual
 let locks = { ...LOCKS };
 DAYS.forEach(d => { if (!(d.key in locks)) locks[d.key] = false; });
 
 // ============================================================
-// RESULTADOS AGREGADOS (editar manualmente entre os dias)
+// ESTADO DAS RESPOSTAS E PERSISTÊNCIA LOCAL
 // ============================================================
-// Cole aqui a contagem de respostas coletadas (ex: via Google
-// Forms ou contagem manual em sala) para cada opção de cada dia.
-// A ordem dos números corresponde à ordem das opções em "opts"
-// no array DAYS (acima): [opção 1, opção 2, opção 3, opção 4, opção 5].
-//
-// Exemplo: se no Dia 1, 8 alunos escolheram a opção 1 (🚀),
-// 5 escolheram a opção 2 (😊), 2 a opção 3, 1 a opção 4 e
-// 0 a opção 5, o array fica: [8, 5, 2, 1, 0]
-//
-// Esses números são SOMADOS ao voto que o próprio aluno der na
-// página (em memória), então o termômetro reflete: total já
-// coletado + o voto desta sessão.
-
-const RESULTS = {
-  d1: [0, 0, 0, 0, 0],
-  d2: [0, 0, 0, 0, 0],
-  d3: [0, 0, 0, 0, 0],
-  d4: [0, 0, 0, 0, 0]
-};
-
-// ============================================================
-// ESTADO DAS RESPOSTAS (RESULTS pré-carregado + voto local)
-// ============================================================
-// O array "votes" de cada dia começa com uma cópia de RESULTS.
-// O voto que o aluno confirmar nesta sessão é somado por cima.
-// Não há gravação em arquivo, localStorage ou backend — para
-// "salvar" o resultado de uma sessão, copie os totais exibidos
-// na tela e atualize o objeto RESULTS manualmente depois da aula.
-
 let state = {};
 DAYS.forEach(d => {
-  const base = RESULTS[d.key] && RESULTS[d.key].length === d.opts.length
-    ? [...RESULTS[d.key]]
-    : new Array(d.opts.length).fill(0);
-  state[d.key] = { votes: base, myVote: -1, confirmed: false };
+  const savedVote = localStorage.getItem(`vote_${d.key}`);
+  state[d.key] = { 
+    votes: new Array(d.opts.length).fill(0), 
+    myVote: savedVote !== null ? parseInt(savedVote) : -1, 
+    confirmed: savedVote !== null 
+  };
 });
  
 let cur = 'd1';
-let pendingVote = -1; // escolha aguardando confirmação no modal
+let pendingVote = -1;
 
 const tColors = ['#E24B4A','#EF9F27','#F5C842','#5DCAA5','#1D9E75'];
 const tDescs = ['Precisamos de atenção 😕','Ainda em dúvida 😐','Na média 🤔','Gostando bastante 😊','Muito empolgado! 🚀'];
+
+// ============================================================
+// LISTENER EM TEMPO REAL DO FIREBASE
+// ============================================================
+onValue(ref(db, 'votes'), (snapshot) => {
+  const data = snapshot.val() || {};
+  
+  DAYS.forEach(d => {
+    // Zera contagem antes de processar os dados novos
+    state[d.key].votes = new Array(d.opts.length).fill(0);
+    
+    if (data[d.key]) {
+      Object.values(data[d.key]).forEach(vote => {
+        if (vote.optIndex >= 0 && vote.optIndex < d.opts.length) {
+          state[d.key].votes[vote.optIndex]++;
+        }
+      });
+    }
+  });
+
+  // Atualiza as barras e o termômetro em tempo real sem recriar a tela toda
+  if (cur && locks[cur]) {
+      refreshBars(cur);
+      updateThermo(cur);
+  }
+});
  
 function updateThermo(key) {
   const s = state[key]; const day = DAYS.find(d=>d.key===key);
@@ -443,9 +447,21 @@ document.getElementById('confirmOverlay').addEventListener('click', (e)=>{
 document.getElementById('confirmVote').addEventListener('click', ()=>{
   if (pendingVote < 0) return;
   const s = state[cur];
+  
+  if (s.confirmed) return; // proteção dupla
+
   s.myVote = pendingVote;
-  s.votes[pendingVote]++;
   s.confirmed = true;
+  
+  // 1. Salva localmente para o navegador lembrar e não deixar votar 2x
+  localStorage.setItem(`vote_${cur}`, pendingVote.toString());
+  
+  // 2. Envia para o Firebase (Tempo real)
+  push(ref(db, `votes/${cur}`), {
+    optIndex: pendingVote,
+    timestamp: Date.now()
+  });
+
   document.getElementById('confirmOverlay').classList.remove('show');
   pendingVote = -1;
   renderDay(cur);
@@ -470,14 +486,8 @@ function confetti() {
 }
 
 // ============================================================
-// PAINEL DO PROFESSOR (consulta do estado atual + instruções)
+// PAINEL DO PROFESSOR
 // ============================================================
-// Este painel é apenas informativo: mostra o status atual de
-// cada dia (definido pela constante LOCKS no topo do código) e
-// explica como liberar um novo dia. Não há senha, toggle nem
-// gravação — a única forma de mudar o estado é editar LOCKS no
-// código-fonte e publicar novamente a página.
-
 const adminOverlay = document.getElementById('adminOverlay');
 const adminModal = document.getElementById('adminModal');
 
@@ -494,7 +504,7 @@ function renderAdminPanel() {
   adminModal.innerHTML = `
     <div class="ic">🛠️</div>
     <h3>Status das etapas</h3>
-    <p>Este é o status atual, definido no código (objeto <b>LOCKS</b>). Para liberar um novo dia, edite o valor correspondente para <b>true</b> no código-fonte e publique a página novamente.</p>
+    <p>Este é o status atual, definido no código (objeto <b>LOCKS</b>). Para liberar um novo dia, edite o valor correspondente para <b>true</b> no código-fonte do <code>index.html</code> e faça push para o GitHub.</p>
     <div class="admin-day-list">${rows}</div>
     <div class="modal-actions">
       <button class="btn-confirm" id="adminClose" style="flex:1">Entendi</button>
@@ -534,7 +544,6 @@ function buildTabs() {
 }
 
 buildTabs();
-// abre na primeira aba liberada (normalmente d1)
 const firstUnlocked = DAYS.find(d=>locks[d.key])?.key || DAYS[0].key;
 renderDay(firstUnlocked);
 

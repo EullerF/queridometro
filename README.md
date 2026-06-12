@@ -1,25 +1,25 @@
 # 🌡️ Queridômetro – Google Classroom
 
-Uma aplicação web simples de avaliação de sentimentos (estilo "Termômetro") projetada para acompanhar o engajamento e as percepções dos alunos ao longo de um curso sobre o Google Classroom no SENAI.
+Uma aplicação web de avaliação de sentimentos (estilo "Termômetro") projetada para acompanhar o engajamento e as percepções dos alunos ao longo de um curso sobre o Google Classroom no SENAI.
 
 ## 🎯 Objetivo
 
-Permitir que o professor avalie diariamente o "clima" da turma. A cada dia, os alunos respondem a uma pergunta rápida sobre como estão se sentindo em relação aos conteúdos apresentados. O site calcula o humor médio e exibe visualmente em um termômetro iterativo, junto com a opção líder.
+Permitir que o professor avalie diariamente o "clima" da turma de forma centralizada. A cada dia, os alunos respondem a uma pergunta rápida sobre como estão se sentindo em relação aos conteúdos apresentados. O site calcula o humor médio em **tempo real** e exibe visualmente em um termômetro animado, junto com a opção líder.
 
 ## ✨ Funcionalidades
 
+- **Sincronização em Tempo Real (Firebase):** Quando um aluno vota, o termômetro de todos os outros alunos na sala é atualizado instantaneamente, refletindo a média real da turma sem necessidade de recarregar a página.
 - **Múltiplos Dias (Abas):** 4 dias de avaliação pré-configurados.
-- **Sistema de Travas (Locks):** O professor controla quais dias estão visíveis/liberados para a turma.
+- **Sistema de Travas (Locks):** O professor controla quais dias estão visíveis/liberados para a turma diretamente no código.
+- **Prevenção de Votos Duplos:** Utiliza `localStorage` para impedir que o mesmo aluno vote mais de uma vez na mesma máquina no mesmo dia.
 - **Termômetro Animado:** Um termômetro interativo em SVG que muda de cor (de vermelho a verde) dependendo da média dos votos (Humor Médio).
-- **Estatísticas em Tempo Real:** Exibição da porcentagem e quantidade de votos local.
-- **Sem Dependência de Backend:** A aplicação roda 100% no navegador (Vanilla JS, CSS e HTML).
 
 ## ⚙️ Como Configurar e Utilizar
 
-Por ser uma aplicação totalmente estática (ideal para rodar no Google Sites ou GitHub Pages), o estado de liberação e os resultados globais são controlados pela edição direta no código-fonte do `index.html`.
+A aplicação roda nativamente no front-end (GitHub Pages, Google Sites), enquanto todo o armazenamento de dados é gerenciado automaticamente de forma gratuita pelo **Firebase Realtime Database**.
 
-### 1. Liberando um dia
-Para desbloquear o questionário de um novo dia para os alunos, edite a constante `LOCKS` no código:
+### 1. Liberando um dia para os alunos
+Para desbloquear o questionário de um novo dia, o professor precisa editar a constante `LOCKS` no arquivo `index.html`:
 ```javascript
 const LOCKS = {
   d1: true,  // Liberado
@@ -28,21 +28,16 @@ const LOCKS = {
   d4: false  // Bloqueado
 };
 ```
-Após alterar, basta salvar/publicar o arquivo novamente.
+Após alterar (mudando `false` para `true`), basta fazer um novo commit/push para o GitHub Pages ou republicar o código no Google Sites.
 
-### 2. Atualizando Resultados Globais
-Como não há um banco de dados integrado, os votos confirmados em sala (via Forms ou contagem manual) podem ser alimentados no sistema agregando-os na constante `RESULTS`:
-```javascript
-const RESULTS = {
-  d1: [8, 5, 2, 1, 0], // Quantidade de votos para as opções 1 a 5 do Dia 1
-  d2: [0, 0, 0, 0, 0],
-  // ...
-};
-```
-Isso atualizará os gráficos, as porcentagens de resposta e o nível visual do Termômetro.
+### 2. Acompanhamento dos Resultados
+Você não precisa editar o código para contabilizar as respostas. Os votos são agregados no banco de dados automaticamente. Você pode:
+- Apenas observar o termômetro na tela principal da aplicação, que já mostrará a média exata de todos os alunos que responderam.
+- (Opcional) Acessar o [Console do Firebase](https://console.firebase.google.com/), abrir seu projeto e acessar o "Realtime Database" para visualizar os dados crus caso deseje exportar ou zerar testes antigos.
 
 ## 🚀 Tecnologias
 
 - **HTML5** e **CSS3** puros (utilizando variáveis, Grid, Flexbox e animações CSS).
-- **JavaScript Vanilla** (ECMAScript 6+).
+- **JavaScript (ES Modules)** para a lógica da aplicação.
+- **Firebase Realtime Database** (BaaS) para persistência em nuvem e processamento de concorrência sem backend.
 - Ícones em formato de Emojis e ilustrações em SVG.
