@@ -312,10 +312,10 @@ document.getElementById('alertClose').addEventListener('click', () => {
 // AUTENTICAÇÃO DO ADMIN
 // ============================================================
 let adminUser = null;
-const ADMIN_EMAIL = 'euler.ferreira19@gmail.com';
+const ADMIN_EMAILS = ['euler.ferreira19@gmail.com', 'euller.silva@docente.pr.senai.br']; // Adicione os e-mails aqui
 
 onAuthStateChanged(auth, (user) => {
-  if (user && user.email === ADMIN_EMAIL) {
+  if (user && ADMIN_EMAILS.includes(user.email)) {
     adminUser = user;
   } else {
     adminUser = null;
@@ -572,7 +572,7 @@ function renderAdminPanel() {
     document.getElementById('adminClose').addEventListener('click', closeAdmin);
     document.getElementById('adminLogin').addEventListener('click', () => {
       signInWithPopup(auth, provider).then((result) => {
-        if (result.user.email !== ADMIN_EMAIL) {
+        if (!ADMIN_EMAILS.includes(result.user.email)) {
           showAlert("Sua conta não tem permissão para acessar o painel de controle.");
         }
       }).catch(err => {
