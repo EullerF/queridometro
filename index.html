@@ -207,6 +207,18 @@
     <!-- conteúdo renderizado via JS -->
   </div>
 </div>
+
+<!-- MODAL DE ALERTA -->
+<div class="overlay" id="alertOverlay" style="z-index: 2000;">
+  <div class="modal">
+    <div class="ic" id="alertIcon">🚫</div>
+    <h3 id="alertTitle">Acesso Negado</h3>
+    <p id="alertMessage">Sua conta não tem permissão.</p>
+    <div class="modal-actions">
+      <button class="btn-confirm" id="alertClose" style="flex:1">OK</button>
+    </div>
+  </div>
+</div>
  
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -284,6 +296,17 @@ const analytics = getAnalytics(app);
 const db = getDatabase(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+
+function showAlert(message, icon = '🚫', title = 'Acesso Negado') {
+  document.getElementById('alertIcon').textContent = icon;
+  document.getElementById('alertTitle').textContent = title;
+  document.getElementById('alertMessage').textContent = message;
+  document.getElementById('alertOverlay').classList.add('show');
+}
+
+document.getElementById('alertClose').addEventListener('click', () => {
+  document.getElementById('alertOverlay').classList.remove('show');
+});
 
 // ============================================================
 // AUTENTICAÇÃO DO ADMIN
@@ -548,7 +571,15 @@ function renderAdminPanel() {
     `;
     document.getElementById('adminClose').addEventListener('click', closeAdmin);
     document.getElementById('adminLogin').addEventListener('click', () => {
-      signInWithPopup(auth, provider).catch(err => alert("Erro ao fazer login: " + err.message));
+      signInWithPopup(auth, provider).then((result) => {
+        if (result.user.email !== ADMIN_EMAIL) {
+          showAlert("Sua conta não tem permissão para acessar o painel de controle.");
+        }
+      }).catch(err => {
+        if (err.code !== 'auth/popup-closed-by-user') {
+          showAlert("Erro ao fazer login: " + err.message, "⚠️", "Erro");
+        }
+      });
     });
     return;
   }
