@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🌡️ Queridômetro – Google Classroom</title>
+<style>
+  :root {
+    --blue: #185FA5;
+    --blue-light: #E6F1FB;
+    --green: #1D9E75;
+    --red: #E24B4A;
+    --yellow: #EF9F27;
+    --bg: #F4F7FA;
+    --card: #FFFFFF;
+    --text: #1A2233;
+    --text2: #5A6880;
+    --text3: #9AAAB8;
+    --border: #DDE3EC;
+    --radius: 14px;
+    --shadow: 0 2px 16px rgba(24,95,165,.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+ 
+  /* HERO */
+  .hero { background: linear-gradient(135deg, #185FA5 0%, #1D9E75 100%); color: #fff; text-align: center; padding: 2rem 1rem 3rem; position: relative; }
+  .hero h1 { font-size: clamp(22px,5vw,32px); font-weight: 700; letter-spacing: -.02em; }
+  .hero p { font-size: 15px; opacity: .85; margin-top: 6px; }
+
+  .admin-btn { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); color: #fff; font-size: 11px; padding: 6px 10px; border-radius: 20px; cursor: pointer; backdrop-filter: blur(2px); }
+  .admin-btn:hover { background: rgba(255,255,255,.3); }
+ 
+  /* TABS */
+  .tabs-wrap { background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  .tabs { display: flex; overflow-x: auto; max-width: 720px; margin: 0 auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 1; min-width: 80px; padding: 14px 10px; text-align: center; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; transition: all .15s; position: relative; }
+  .tab:hover { color: var(--blue); background: var(--blue-light); }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+  .tab.locked { color: var(--text3); cursor: not-allowed; }
+  .tab.locked:hover { background: none; color: var(--text3); }
+  .tab .lock-ic { font-size: 11px; margin-left: 4px; }
+ 
+  /* LAYOUT */
+  .container { max-width: 720px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+  .grid { display: grid; grid-template-columns: 1fr 130px; gap: 1.25rem; align-items: start; }
+  @media(max-width:520px){ .grid { grid-template-columns: 1fr; } }
+ 
+  /* CARD */
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.4rem; }
+  .day-badge { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--blue); background: var(--blue-light); padding: 3px 10px; border-radius: 20px; margin-bottom: 10px; }
+  .day-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .day-subtitle { font-size: 13px; color: var(--text2); margin-bottom: 1rem; }
+  .question { font-size: 14px; color: var(--text); background: var(--bg); border-left: 3px solid var(--blue); border-radius: 8px; padding: 10px 14px; margin-bottom: 1.1rem; line-height: 1.5; }
+ 
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .opt { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--card); cursor: pointer; text-align: left; width: 100%; transition: all .15s; }
+  .opt:hover { border-color: var(--blue); background: var(--blue-light); }
+  .opt.selected { border-color: var(--blue); background: var(--blue-light); }
+  .opt.voted { cursor: default; }
+  .opt.voted:hover { border-color: var(--border); background: var(--card); }
+  .opt.voted.selected:hover { border-color: var(--blue); background: var(--blue-light); }
+  .opt-emoji { font-size: 22px; flex-shrink: 0; }
+  .opt-text { font-size: 13px; color: var(--text); flex: 1; line-height: 1.4; }
+  .opt-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 56px; }
+  .opt-pct { font-size: 11px; font-weight: 600; color: var(--blue); }
+  .bar-track { width: 56px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; background: var(--blue); transition: width .5s cubic-bezier(.4,0,.2,1); }
+ 
+  .voted-msg { margin-top: .85rem; text-align: center; font-size: 13px; color: var(--green); font-weight: 500; display: none; }
+
+  /* LOCKED STATE */
+  .locked-card { text-align: center; padding: 2.5rem 1.4rem; }
+  .locked-card .ic { font-size: 40px; margin-bottom: 10px; }
+  .locked-card h3 { font-size: 18px; margin-bottom: 6px; }
+  .locked-card p { font-size: 13px; color: var(--text2); }
+ 
+  /* TERMÔMETRO */
+  .thermo-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.2rem .75rem; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .thermo-label-top { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); }
+  .thermo-svg { width: 56px; display: block; }
+  .thermo-desc { font-size: 11px; color: var(--text2); text-align: center; max-width: 90px; line-height: 1.4; font-weight: 500; }
+ 
+  /* STATS */
+  .stats { display: flex; gap: 10px; margin-top: 1.25rem; }
+  .stat { flex: 1; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: .9rem .75rem; text-align: center; }
+  .stat-n { font-size: 24px; font-weight: 700; color: var(--text); }
+  .stat-l { font-size: 11px; color: var(--text3); margin-top: 2px; }
+ 
+  /* FOOTER */
+  footer { text-align: center; padding: 1.5rem 1rem; font-size: 12px; color: var(--text3); }
+ 
+  /* CONFETTI SPLASH */
+  @keyframes pop { 0%{transform:scale(.5);opacity:1} 100%{transform:scale(2.5);opacity:0} }
+  .confetti-dot { position: fixed; border-radius: 50%; pointer-events: none; animation: pop .6s ease forwards; }
+
+  /* MODAL OVERLAY */
+  .overlay { position: fixed; inset: 0; background: rgba(20,30,45,.45); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
+  .overlay.show { display: flex; }
+  .modal { background: var(--card); border-radius: var(--radius); box-shadow: 0 10px 40px rgba(0,0,0,.2); padding: 1.5rem; max-width: 360px; width: 100%; text-align: center; }
+  .modal .ic { font-size: 34px; margin-bottom: 8px; }
+  .modal h3 { font-size: 17px; margin-bottom: 6px; }
+  .modal p { font-size: 13px; color: var(--text2); margin-bottom: 1.2rem; line-height: 1.5; }
+  .modal .chosen { display: inline-flex; align-items: center; gap: 8px; background: var(--blue-light); border-radius: 10px; padding: 8px 14px; font-size: 13px; color: var(--text); margin-bottom: 1.2rem; font-weight: 500; }
+  .modal .chosen .e { font-size: 20px; }
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-actions button { flex: 1; padding: 11px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: opacity .15s; }
+  .modal-actions button:hover { opacity: .9; }
+  .btn-cancel { background: var(--bg); color: var(--text2); border: 1.5px solid var(--border) !important; }
+  .btn-confirm { background: var(--blue); color: #fff; }
+
+  /* ADMIN MODAL */
+  .admin-modal { max-width: 320px; }
+  .admin-day-list { display: flex; flex-direction: column; gap: 8px; margin: 1rem 0; text-align: left; }
+  .admin-day-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .admin-day-row .name { font-weight: 600; }
+  .admin-day-row .status { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 600; }
+  .status-locked { background: #FCE8E8; color: var(--red); }
+  .status-unlocked { background: #E3F6EE; color: var(--green); }
+  .admin-hint { font-size: 11px; color: var(--text3); margin-bottom: .6rem; }
+  .admin-hint code { background: var(--blue-light); padding: 1px 5px; border-radius: 4px; font-size: 10px; }
+</style>
+</head>
+<body>
+ 
+<div class="hero">
+  <button class="admin-btn" id="adminBtn">🛠️ Status das etapas</button>
+<h1>🌡️ Queridômetro</h1>
+<p>Curso Google Classroom — Como você está se sentindo hoje?</p>
+</div>
+ 
+<div class="tabs-wrap">
+<div class="tabs" id="tabs"></div>
+</div>
+ 
+<div class="container">
+<div class="grid">
+<div class="card" id="qcard">
+<!-- conteúdo renderizado via JS -->
+</div>
+ 
+    <div class="thermo-card">
+<div class="thermo-label-top">Termômetro</div>
+<svg class="thermo-svg" id="tSvg" viewBox="0 0 56 230" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<clipPath id="tc"><rect x="20" y="12" width="16" height="162" rx="8"/></clipPath>
+<linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#1D9E75"/>
+<stop offset="50%" stop-color="#EF9F27"/>
+<stop offset="100%" stop-color="#E24B4A"/>
+</linearGradient>
+</defs>
+<!-- tube bg -->
+<rect x="20" y="12" width="16" height="162" rx="8" fill="#EEF3FA" stroke="#C8D8EE" stroke-width="1.2"/>
+<!-- fill -->
+<rect id="tFill" x="20" y="174" width="16" height="0" clip-path="url(#tc)" fill="url(#tg)"/>
+<!-- ticks -->
+<line x1="36" y1="34"  x2="44" y2="34"  stroke="#C8D8EE" stroke-width="1.2"/>
+<line x1="36" y1="66"  x2="44" y2="66"  stroke="#C8D8EE" stroke-width="1.2"/>
+<line x1="36" y1="98"  x2="44" y2="98"  stroke="#C8D8EE" stroke-width="1.2"/>
+<line x1="36" y1="130" x2="44" y2="130" stroke="#C8D8EE" stroke-width="1.2"/>
+<line x1="36" y1="162" x2="44" y2="162" stroke="#C8D8EE" stroke-width="1.2"/>
+<!-- tick labels -->
+<text x="46" y="38"  font-size="9" fill="#185FA5">😍</text>
+<text x="46" y="70"  font-size="9" fill="#185FA5">😊</text>
+<text x="46" y="102" font-size="9" fill="#185FA5">🤔</text>
+<text x="46" y="134" font-size="9" fill="#185FA5">😐</text>
+<text x="46" y="166" font-size="9" fill="#185FA5">😕</text>
+<!-- bulb -->
+<circle cx="28" cy="202" r="16" fill="#E24B4A" stroke="#A32D2D" stroke-width="1.5"/>
+<circle id="tBulb" cx="28" cy="202" r="11" fill="#FF7070"/>
+</svg>
+<div class="thermo-desc" id="tDesc">Aguardando votos</div>
+</div>
+</div>
+ 
+  <div class="stats">
+<div class="stat"><div class="stat-n" id="sTotal">0</div><div class="stat-l">respostas hoje</div></div>
+<div class="stat"><div class="stat-n" id="sScore">—</div><div class="stat-l">humor médio</div></div>
+<div class="stat"><div class="stat-n" id="sTop">—</div><div class="stat-l">opção líder</div></div>
+</div>
+</div>
+ 
+<footer>Queridômetro · Curso Google Classroom · SENAI</footer>
+
+<!-- MODAL DE CONFIRMAÇÃO DE RESPOSTA -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal">
+    <div class="ic">🤔</div>
+    <h3>Confirmar resposta?</h3>
+    <p>Após confirmar, não será possível alterar sua escolha para esta pergunta.</p>
+    <div class="chosen" id="chosenPreview"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelVote">Voltar</button>
+      <button class="btn-confirm" id="confirmVote">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DO PAINEL DO PROFESSOR -->
+<div class="overlay" id="adminOverlay">
+  <div class="modal admin-modal" id="adminModal">
+    <!-- conteúdo renderizado via JS -->
+  </div>
+</div>
+ 
+<script>
+const DAYS = [
+  {
+    key:'d1', tab:'Dia 1', badge:'DIA 1 – APRESENTAÇÃO',
+    title:'Primeiras Impressões', sub:'Google Classroom',
+    q:'👉 Depois de conhecer o Classroom hoje, qual foi sua percepção?',
+    opts:[
+      {e:'🚀',t:'Quero explorar mais.',s:5},
+      {e:'😊',t:'Gostei do que vi.',s:4},
+      {e:'🤔',t:'Parece interessante.',s:3},
+      {e:'😐',t:'Ainda não entendi o potencial.',s:2},
+      {e:'❓',t:'Tenho muitas dúvidas.',s:1}
+    ]
+  },
+  {
+    key:'d2', tab:'Dia 2', badge:'DIA 2 – EXPERIMENTAÇÃO',
+    title:'Descobrindo Possibilidades', sub:'Google Classroom',
+    q:'👉 Após navegar e testar os recursos, como você se sente?',
+    opts:[
+      {e:'🔥',t:'Quero descobrir mais funcionalidades.',s:5},
+      {e:'👍',t:'Estou gostando da experiência.',s:4},
+      {e:'🤔',t:'Ainda estou avaliando.',s:3},
+      {e:'😬',t:'Preciso de mais prática.',s:2},
+      {e:'🆘',t:'Estou um pouco perdido(a).',s:1}
+    ]
+  },
+  {
+    key:'d3', tab:'Dia 3', badge:'DIA 3 – MÃO NA MASSA',
+    title:'Aplicação na Prática', sub:'Google Classroom',
+    q:'👉 Depois de criar atividades e organizar turmas, qual sua posição?',
+    opts:[
+      {e:'🎯',t:'Já consigo imaginar usando com meus alunos.',s:5},
+      {e:'💡',t:'Vejo várias possibilidades.',s:4},
+      {e:'😊',t:'Estou ganhando confiança.',s:3},
+      {e:'🤔',t:'Ainda preciso praticar.',s:2},
+      {e:'⚠️',t:'Ainda não me sinto preparado(a).',s:1}
+    ]
+  },
+  {
+    key:'d4', tab:'Dia 4', badge:'DIA 4 – ENCERRAMENTO',
+    title:'Vai para a Sala de Aula?', sub:'Google Classroom',
+    q:'👉 O que você pretende fazer com o Classroom após o curso?',
+    opts:[
+      {e:'🚀',t:'Vou começar a usar imediatamente.',s:5},
+      {e:'📅',t:'Vou planejar a implementação.',s:4},
+      {e:'📚',t:'Vou continuar estudando a ferramenta.',s:3},
+      {e:'🤔',t:'Ainda preciso refletir.',s:2},
+      {e:'📦',t:'Não pretendo utilizar por enquanto.',s:1}
+    ]
+  }
+];
+
+// ============================================================
+// CONTROLE DE LIBERAÇÃO DOS DIAS (gatilho manual do professor)
+// ============================================================
+// COMO LIBERAR UM DIA:
+// Altere o valor para "true" no objeto LOCKS abaixo e salve/publique
+// o arquivo novamente (ex: commit no GitHub Pages, ou republicar
+// no Google Sites). Não há gravação automática nem fetch — é só
+// essa constante que define o que cada aluno vê ao abrir a página.
+//
+//   true  = dia liberado (aluno pode responder/ver resultados)
+//   false = dia bloqueado (aparece como "ainda não liberado")
+//
+// Exemplo: para liberar o Dia 2, troque "d2: false" por "d2: true"
+// e publique novamente.
+
+const LOCKS = {
+  d1: true,
+  d2: false,
+  d3: false,
+  d4: false
+};
+
+// garante que todos os dias do array DAYS existam em LOCKS,
+// mesmo que algum tenha sido esquecido na edição manual
+let locks = { ...LOCKS };
+DAYS.forEach(d => { if (!(d.key in locks)) locks[d.key] = false; });
+
+// ============================================================
+// RESULTADOS AGREGADOS (editar manualmente entre os dias)
+// ============================================================
+// Cole aqui a contagem de respostas coletadas (ex: via Google
+// Forms ou contagem manual em sala) para cada opção de cada dia.
+// A ordem dos números corresponde à ordem das opções em "opts"
+// no array DAYS (acima): [opção 1, opção 2, opção 3, opção 4, opção 5].
+//
+// Exemplo: se no Dia 1, 8 alunos escolheram a opção 1 (🚀),
+// 5 escolheram a opção 2 (😊), 2 a opção 3, 1 a opção 4 e
+// 0 a opção 5, o array fica: [8, 5, 2, 1, 0]
+//
+// Esses números são SOMADOS ao voto que o próprio aluno der na
+// página (em memória), então o termômetro reflete: total já
+// coletado + o voto desta sessão.
+
+const RESULTS = {
+  d1: [0, 0, 0, 0, 0],
+  d2: [0, 0, 0, 0, 0],
+  d3: [0, 0, 0, 0, 0],
+  d4: [0, 0, 0, 0, 0]
+};
+
+// ============================================================
+// ESTADO DAS RESPOSTAS (RESULTS pré-carregado + voto local)
+// ============================================================
+// O array "votes" de cada dia começa com uma cópia de RESULTS.
+// O voto que o aluno confirmar nesta sessão é somado por cima.
+// Não há gravação em arquivo, localStorage ou backend — para
+// "salvar" o resultado de uma sessão, copie os totais exibidos
+// na tela e atualize o objeto RESULTS manualmente depois da aula.
+
+let state = {};
+DAYS.forEach(d => {
+  const base = RESULTS[d.key] && RESULTS[d.key].length === d.opts.length
+    ? [...RESULTS[d.key]]
+    : new Array(d.opts.length).fill(0);
+  state[d.key] = { votes: base, myVote: -1, confirmed: false };
+});
+ 
+let cur = 'd1';
+let pendingVote = -1; // escolha aguardando confirmação no modal
+
+const tColors = ['#E24B4A','#EF9F27','#F5C842','#5DCAA5','#1D9E75'];
+const tDescs = ['Precisamos de atenção 😕','Ainda em dúvida 😐','Na média 🤔','Gostando bastante 😊','Muito empolgado! 🚀'];
+ 
+function updateThermo(key) {
+  const s = state[key]; const day = DAYS.find(d=>d.key===key);
+  const total = s.votes.reduce((a,b)=>a+b,0);
+  let score = 0;
+  if(total>0) score = s.votes.reduce((acc,v,i)=>acc+v*day.opts[i].s,0)/total;
+  const pct = Math.max(0,Math.min(1,(score-1)/4));
+  const maxH = 152; const h = Math.round(pct*maxH);
+  const fill = document.getElementById('tFill');
+  fill.setAttribute('y', 174-h);
+  fill.setAttribute('height', h);
+  const ci = Math.max(0,Math.min(4,Math.round(pct*4)));
+  const bulb = document.getElementById('tBulb');
+  bulb.setAttribute('fill', tColors[ci]);
+  document.getElementById('tDesc').textContent = total>0 ? tDescs[ci] : 'Aguardando votos';
+  document.getElementById('sTotal').textContent = total;
+  document.getElementById('sScore').textContent = total>0 ? score.toFixed(1)+'/5' : '—';
+  if(total>0){
+    const mx = s.votes.indexOf(Math.max(...s.votes));
+    document.getElementById('sTop').textContent = day.opts[mx].e;
+  } else { document.getElementById('sTop').textContent = '—'; }
+}
+ 
+function refreshBars(key) {
+  const s = state[key]; const day = DAYS.find(d=>d.key===key);
+  const total = s.votes.reduce((a,b)=>a+b,0);
+  document.querySelectorAll('#qcard .opt').forEach((el,i)=>{
+    const pct = total>0 ? Math.round(s.votes[i]/total*100) : 0;
+    const fillEl = el.querySelector('.bar-fill');
+    const pctEl = el.querySelector('.opt-pct');
+    if(fillEl) fillEl.style.width = pct+'%';
+    if(pctEl) pctEl.textContent = total>0 ? pct+'%' : '';
+  });
+}
+
+function renderLockedCard(day) {
+  const card = document.getElementById('qcard');
+  card.innerHTML = `
+    <div class="locked-card">
+      <div class="ic">🔒</div>
+      <h3>${day.tab} ainda não foi liberado</h3>
+      <p>Aguarde o professor liberar esta etapa do questionário.</p>
+    </div>`;
+}
+ 
+function renderDay(key) {
+  cur = key;
+  const day = DAYS.find(d=>d.key===key);
+  const s = state[key];
+
+  if (!locks[key]) {
+    renderLockedCard(day);
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.k===key));
+    refreshBars(key);
+    updateThermo(key);
+    return;
+  }
+
+  const card = document.getElementById('qcard');
+  card.innerHTML = `
+    <div class="day-badge">${day.badge}</div>
+    <div class="day-title">${day.title}</div>
+    <div class="day-subtitle">${day.sub}</div>
+    <div class="question">${day.q}</div>
+    <div class="options" id="optList"></div>
+    <div class="voted-msg" id="votedMsg">✅ Obrigado! Sua resposta foi registrada.</div>
+  `;
+
+  const list = document.getElementById('optList');
+  day.opts.forEach((opt,i)=>{
+    const btn = document.createElement('button');
+    const isSelected = s.myVote===i;
+    btn.className = 'opt' + (isSelected?' selected':'') + (s.confirmed?' voted':'');
+    btn.dataset.i = i;
+    btn.innerHTML = `<span class="opt-emoji">${opt.e}</span><span class="opt-text">${opt.t}</span><div class="opt-right"><span class="opt-pct"></span><div class="bar-track"><div class="bar-fill" style="width:0%"></div></div></div>`;
+    if(!s.confirmed) btn.addEventListener('click',()=>openConfirm(i));
+    list.appendChild(btn);
+  });
+
+  const vm = document.getElementById('votedMsg');
+  vm.style.display = s.confirmed ? 'block' : 'none';
+
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.k===key));
+  refreshBars(key);
+  updateThermo(key);
+}
+
+// ============================================================
+// MODAL DE CONFIRMAÇÃO DE RESPOSTA
+// ============================================================
+function openConfirm(i) {
+  const s = state[cur];
+  if (s.confirmed) return;
+  const day = DAYS.find(d=>d.key===cur);
+  pendingVote = i;
+  const opt = day.opts[i];
+  document.getElementById('chosenPreview').innerHTML = `<span class="e">${opt.e}</span><span>${opt.t}</span>`;
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+
+function closeConfirm() {
+  pendingVote = -1;
+  document.getElementById('confirmOverlay').classList.remove('show');
+}
+
+document.getElementById('cancelVote').addEventListener('click', closeConfirm);
+
+document.getElementById('confirmOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'confirmOverlay') closeConfirm();
+});
+
+document.getElementById('confirmVote').addEventListener('click', ()=>{
+  if (pendingVote < 0) return;
+  const s = state[cur];
+  s.myVote = pendingVote;
+  s.votes[pendingVote]++;
+  s.confirmed = true;
+  document.getElementById('confirmOverlay').classList.remove('show');
+  pendingVote = -1;
+  renderDay(cur);
+  confetti();
+});
+ 
+function confetti() {
+  const colors=['#185FA5','#1D9E75','#EF9F27','#E24B4A','#9B59B6'];
+  for(let i=0;i<18;i++){
+    const d=document.createElement('div');
+    d.className='confetti-dot';
+    const size=6+Math.random()*8;
+    Object.assign(d.style,{
+      width:size+'px', height:size+'px',
+      background:colors[Math.floor(Math.random()*colors.length)],
+      left:(30+Math.random()*40)+'vw', top:(30+Math.random()*30)+'vh',
+      zIndex:9999
+    });
+    document.body.appendChild(d);
+    setTimeout(()=>d.remove(),700);
+  }
+}
+
+// ============================================================
+// PAINEL DO PROFESSOR (consulta do estado atual + instruções)
+// ============================================================
+// Este painel é apenas informativo: mostra o status atual de
+// cada dia (definido pela constante LOCKS no topo do código) e
+// explica como liberar um novo dia. Não há senha, toggle nem
+// gravação — a única forma de mudar o estado é editar LOCKS no
+// código-fonte e publicar novamente a página.
+
+const adminOverlay = document.getElementById('adminOverlay');
+const adminModal = document.getElementById('adminModal');
+
+function renderAdminPanel() {
+  const rows = DAYS.map(d=>{
+    const isUnlocked = !!locks[d.key];
+    return `
+      <div class="admin-day-row">
+        <span class="name">${d.tab}</span>
+        <span class="status ${isUnlocked?'status-unlocked':'status-locked'}">${isUnlocked?'Liberado':'Bloqueado'}</span>
+      </div>`;
+  }).join('');
+
+  adminModal.innerHTML = `
+    <div class="ic">🛠️</div>
+    <h3>Status das etapas</h3>
+    <p>Este é o status atual, definido no código (objeto <b>LOCKS</b>). Para liberar um novo dia, edite o valor correspondente para <b>true</b> no código-fonte e publique a página novamente.</p>
+    <div class="admin-day-list">${rows}</div>
+    <div class="modal-actions">
+      <button class="btn-confirm" id="adminClose" style="flex:1">Entendi</button>
+    </div>
+  `;
+  document.getElementById('adminClose').addEventListener('click', closeAdmin);
+}
+
+function openAdmin() {
+  adminOverlay.classList.add('show');
+  renderAdminPanel();
+}
+function closeAdmin() {
+  adminOverlay.classList.remove('show');
+}
+document.getElementById('adminBtn').addEventListener('click', openAdmin);
+adminOverlay.addEventListener('click', (e)=>{ if(e.target.id==='adminOverlay') closeAdmin(); });
+
+// ============================================================
+// CONSTRUÇÃO DAS ABAS
+// ============================================================
+function buildTabs() {
+  const tabsEl = document.getElementById('tabs');
+  tabsEl.innerHTML = '';
+  DAYS.forEach(d=>{
+    const t=document.createElement('button');
+    const unlocked = !!locks[d.key];
+    t.className='tab' + (unlocked?'':' locked');
+    t.dataset.k=d.key;
+    t.innerHTML = d.tab + (unlocked?'':'<span class="lock-ic">🔒</span>');
+    t.addEventListener('click',()=>{
+      if(!locks[d.key]) return;
+      renderDay(d.key);
+    });
+    tabsEl.appendChild(t);
+  });
+}
+
+buildTabs();
+// abre na primeira aba liberada (normalmente d1)
+const firstUnlocked = DAYS.find(d=>locks[d.key])?.key || DAYS[0].key;
+renderDay(firstUnlocked);
+
+</script>
+</body>
+</html>
