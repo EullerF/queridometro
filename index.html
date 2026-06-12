@@ -111,21 +111,20 @@
   .btn-confirm { background: var(--blue); color: #fff; }
 
   /* ADMIN MODAL */
-  .admin-modal { max-width: 320px; }
+  .admin-modal { max-width: 360px; }
   .admin-day-list { display: flex; flex-direction: column; gap: 8px; margin: 1rem 0; text-align: left; }
   .admin-day-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
   .admin-day-row .name { font-weight: 600; }
-  .admin-day-row .status { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 600; }
+  .admin-day-row .status { font-size: 11px; padding: 6px 12px; border-radius: 20px; font-weight: 600; border: none; cursor: pointer; transition: opacity .15s; font-family: inherit; }
+  .admin-day-row .status:hover { opacity: .8; }
   .status-locked { background: #FCE8E8; color: var(--red); }
   .status-unlocked { background: #E3F6EE; color: var(--green); }
-  .admin-hint { font-size: 11px; color: var(--text3); margin-bottom: .6rem; }
-  .admin-hint code { background: var(--blue-light); padding: 1px 5px; border-radius: 4px; font-size: 10px; }
 </style>
 </head>
 <body>
  
 <div class="hero">
-  <button class="admin-btn" id="adminBtn">🛠️ Status das etapas</button>
+  <button class="admin-btn" id="adminBtn">🛠️ Painel Admin</button>
 <h1>🌡️ Queridômetro</h1>
 <p>Curso Google Classroom — Como você está se sentindo hoje?</p>
 </div>
@@ -207,7 +206,8 @@
  
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, push, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
 
 const DAYS = [
@@ -262,7 +262,7 @@ const DAYS = [
 ];
 
 // ============================================================
-// CONFIGURAÇÃO DO FIREBASE (Realtime Database)
+// CONFIGURAÇÃO DO FIREBASE
 // ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyC43NcYJbTbBN-rAq5uWweoTGve8NDBtks",
@@ -278,19 +278,51 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const db = getDatabase(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
 // ============================================================
-// CONTROLE DE LIBERAÇÃO DOS DIAS (gatilho manual do professor)
+// AUTENTICAÇÃO DO ADMIN
 // ============================================================
-const LOCKS = {
-  d1: true,
-  d2: false,
-  d3: false,
-  d4: false
-};
+let adminUser = null;
+const ADMIN_EMAIL = 'euler.ferreira19@gmail.com';
 
-let locks = { ...LOCKS };
-DAYS.forEach(d => { if (!(d.key in locks)) locks[d.key] = false; });
+onAuthStateChanged(auth, (user) => {
+  if (user && user.email === ADMIN_EMAIL) {
+    adminUser = user;
+  } else {
+    adminUser = null;
+    if (user) signOut(auth); // Desloga usuários não autorizados
+  }
+  if (adminOverlay.classList.contains('show')) {
+    renderAdminPanel();
+  }
+});
+
+// ============================================================
+// CONTROLE DE LIBERAÇÃO DOS DIAS
+// ============================================================
+let locks = { d1: true, d2: false, d3: false, d4: false };
+
+onValue(ref(db, 'locks'), (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    locks = { ...locks, ...data };
+  }
+  
+  buildTabs();
+  
+  if (cur && locks[cur]) {
+    renderDay(cur);
+  } else {
+    const firstUnlocked = DAYS.find(d=>locks[d.key])?.key || DAYS[0].key;
+    renderDay(firstUnlocked);
+  }
+  
+  if (adminOverlay.classList.contains('show')) {
+    renderAdminPanel();
+  }
+});
 
 // ============================================================
 // ESTADO DAS RESPOSTAS E PERSISTÊNCIA LOCAL
@@ -318,9 +350,7 @@ onValue(ref(db, 'votes'), (snapshot) => {
   const data = snapshot.val() || {};
   
   DAYS.forEach(d => {
-    // Zera contagem antes de processar os dados novos
     state[d.key].votes = new Array(d.opts.length).fill(0);
-    
     if (data[d.key]) {
       Object.values(data[d.key]).forEach(vote => {
         if (vote.optIndex >= 0 && vote.optIndex < d.opts.length) {
@@ -330,7 +360,6 @@ onValue(ref(db, 'votes'), (snapshot) => {
     }
   });
 
-  // Atualiza as barras e o termômetro em tempo real sem recriar a tela toda
   if (cur && locks[cur]) {
       refreshBars(cur);
       updateThermo(cur);
@@ -451,15 +480,16 @@ document.getElementById('confirmVote').addEventListener('click', ()=>{
   if (pendingVote < 0) return;
   const s = state[cur];
   
-  if (s.confirmed) return; // proteção dupla
+  if (s.confirmed) return;
 
   s.myVote = pendingVote;
   s.confirmed = true;
   
-  // 1. Salva localmente para o navegador lembrar e não deixar votar 2x
+  // Otimista: Incrementa localmente para feedback instantâneo na UI
+  s.votes[pendingVote]++;
+  
   localStorage.setItem(`vote_${cur}`, pendingVote.toString());
   
-  // 2. Envia para o Firebase (Tempo real)
   push(ref(db, `votes/${cur}`), {
     optIndex: pendingVote,
     timestamp: Date.now()
@@ -489,31 +519,61 @@ function confetti() {
 }
 
 // ============================================================
-// PAINEL DO PROFESSOR
+// PAINEL DO PROFESSOR (ADMIN)
 // ============================================================
 const adminOverlay = document.getElementById('adminOverlay');
 const adminModal = document.getElementById('adminModal');
 
 function renderAdminPanel() {
+  if (!adminUser) {
+    adminModal.innerHTML = `
+      <div class="ic">🔐</div>
+      <h3>Acesso Restrito</h3>
+      <p>Apenas o professor pode gerenciar o status das etapas.</p>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="adminClose">Fechar</button>
+        <button class="btn-confirm" id="adminLogin">Login Admin</button>
+      </div>
+    `;
+    document.getElementById('adminClose').addEventListener('click', closeAdmin);
+    document.getElementById('adminLogin').addEventListener('click', () => {
+      signInWithPopup(auth, provider).catch(err => alert("Erro ao fazer login: " + err.message));
+    });
+    return;
+  }
+
   const rows = DAYS.map(d=>{
     const isUnlocked = !!locks[d.key];
     return `
       <div class="admin-day-row">
         <span class="name">${d.tab}</span>
-        <span class="status ${isUnlocked?'status-unlocked':'status-locked'}">${isUnlocked?'Liberado':'Bloqueado'}</span>
+        <button class="status ${isUnlocked?'status-unlocked':'status-locked'}" data-key="${d.key}">
+          ${isUnlocked?'Liberado':'Bloqueado'}
+        </button>
       </div>`;
   }).join('');
 
   adminModal.innerHTML = `
     <div class="ic">🛠️</div>
-    <h3>Status das etapas</h3>
-    <p>Este é o status atual, definido no código (objeto <b>LOCKS</b>). Para liberar um novo dia, edite o valor correspondente para <b>true</b> no código-fonte do <code>index.html</code> e faça push para o GitHub.</p>
+    <h3>Painel do Professor</h3>
+    <p>Clique no status de uma etapa para bloqueá-la ou liberá-la em tempo real para os alunos.</p>
     <div class="admin-day-list">${rows}</div>
     <div class="modal-actions">
-      <button class="btn-confirm" id="adminClose" style="flex:1">Entendi</button>
+      <button class="btn-cancel" id="adminLogout">Sair</button>
+      <button class="btn-confirm" id="adminClose" style="flex:1">Fechar</button>
     </div>
   `;
+  
   document.getElementById('adminClose').addEventListener('click', closeAdmin);
+  document.getElementById('adminLogout').addEventListener('click', () => signOut(auth));
+  
+  document.querySelectorAll('.admin-day-row .status').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const key = e.target.getAttribute('data-key');
+      const newVal = !locks[key];
+      update(ref(db, 'locks'), { [key]: newVal });
+    });
+  });
 }
 
 function openAdmin() {
