@@ -58,8 +58,6 @@
   .opt { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--card); cursor: pointer; text-align: left; width: 100%; transition: all .15s; }
   .opt:hover { border-color: var(--blue); background: var(--blue-light); }
   .opt.selected { border-color: var(--blue); background: var(--blue-light); }
-  .opt.voted { cursor: default; }
-  .opt.voted:hover { border-color: var(--border); background: var(--card); }
   .opt.voted.selected:hover { border-color: var(--blue); background: var(--blue-light); }
   .opt-emoji { font-size: 22px; flex-shrink: 0; }
   .opt-text { font-size: 13px; color: var(--text); flex: 1; line-height: 1.4; }
@@ -69,6 +67,10 @@
   .bar-fill { height: 100%; border-radius: 3px; background: var(--blue); transition: width .5s cubic-bezier(.4,0,.2,1); }
  
   .voted-msg { margin-top: .85rem; text-align: center; font-size: 13px; color: var(--green); font-weight: 500; display: none; }
+
+  /* Thermometer SVG transitions */
+  #tFill { transition: height 0.6s cubic-bezier(.4,0,.2,1), y 0.6s cubic-bezier(.4,0,.2,1); }
+  #tBulb { transition: fill 0.6s cubic-bezier(.4,0,.2,1); }
 
   /* LOCKED STATE */
   .locked-card { text-align: center; padding: 2.5rem 1.4rem; }
@@ -113,10 +115,12 @@
   /* ADMIN MODAL */
   .admin-modal { max-width: 360px; }
   .admin-day-list { display: flex; flex-direction: column; gap: 8px; margin: 1rem 0; text-align: left; }
-  .admin-day-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
-  .admin-day-row .name { font-weight: 600; }
+  .admin-day-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; gap: 8px; }
+  .admin-day-row .name { font-weight: 600; flex: 1; }
   .admin-day-row .status { font-size: 11px; padding: 6px 12px; border-radius: 20px; font-weight: 600; border: none; cursor: pointer; transition: opacity .15s; font-family: inherit; }
   .admin-day-row .status:hover { opacity: .8; }
+  .admin-day-row .btn-clear { font-size: 11px; padding: 6px 10px; border-radius: 20px; font-weight: 600; border: 1.5px solid var(--border); background: var(--card); color: var(--red); cursor: pointer; transition: all .15s; font-family: inherit; }
+  .admin-day-row .btn-clear:hover { background: #FCE8E8; border-color: var(--red); }
   .status-locked { background: #FCE8E8; color: var(--red); }
   .status-unlocked { background: #E3F6EE; color: var(--green); }
 </style>
@@ -188,7 +192,7 @@
   <div class="modal">
     <div class="ic">🤔</div>
     <h3>Confirmar resposta?</h3>
-    <p>Após confirmar, não será possível alterar sua escolha para esta pergunta.</p>
+    <p>Sua resposta anterior será atualizada caso já tenha votado.</p>
     <div class="chosen" id="chosenPreview"></div>
     <div class="modal-actions">
       <button class="btn-cancel" id="cancelVote">Voltar</button>
@@ -206,7 +210,7 @@
  
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, push, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, set, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
 
@@ -327,6 +331,12 @@ onValue(ref(db, 'locks'), (snapshot) => {
 // ============================================================
 // ESTADO DAS RESPOSTAS E PERSISTÊNCIA LOCAL
 // ============================================================
+let uid = localStorage.getItem('queridometro_uid');
+if (!uid) {
+  uid = 'user_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+  localStorage.setItem('queridometro_uid', uid);
+}
+
 let state = {};
 DAYS.forEach(d => {
   const savedVote = localStorage.getItem(`vote_${d.key}`);
@@ -437,15 +447,16 @@ function renderDay(key) {
   day.opts.forEach((opt,i)=>{
     const btn = document.createElement('button');
     const isSelected = s.myVote===i;
-    btn.className = 'opt' + (isSelected?' selected':'') + (s.confirmed?' voted':'');
+    btn.className = 'opt' + (isSelected?' selected':'');
     btn.dataset.i = i;
     btn.innerHTML = `<span class="opt-emoji">${opt.e}</span><span class="opt-text">${opt.t}</span><div class="opt-right"><span class="opt-pct"></span><div class="bar-track"><div class="bar-fill" style="width:0%"></div></div></div>`;
-    if(!s.confirmed) btn.addEventListener('click',()=>openConfirm(i));
+    btn.addEventListener('click',()=>openConfirm(i));
     list.appendChild(btn);
   });
 
   const vm = document.getElementById('votedMsg');
   vm.style.display = s.confirmed ? 'block' : 'none';
+  vm.textContent = "✅ Sua resposta foi registrada. Você pode alterá-la se quiser.";
 
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.k===key));
   refreshBars(key);
@@ -457,7 +468,6 @@ function renderDay(key) {
 // ============================================================
 function openConfirm(i) {
   const s = state[cur];
-  if (s.confirmed) return;
   const day = DAYS.find(d=>d.key===cur);
   pendingVote = i;
   const opt = day.opts[i];
@@ -480,17 +490,18 @@ document.getElementById('confirmVote').addEventListener('click', ()=>{
   if (pendingVote < 0) return;
   const s = state[cur];
   
-  if (s.confirmed) return;
+  // Otimista: Ajusta localmente para feedback instantâneo
+  if (s.myVote !== -1 && s.votes[s.myVote] > 0) {
+    s.votes[s.myVote]--; // Remove voto anterior localmente
+  }
 
   s.myVote = pendingVote;
   s.confirmed = true;
-  
-  // Otimista: Incrementa localmente para feedback instantâneo na UI
   s.votes[pendingVote]++;
   
   localStorage.setItem(`vote_${cur}`, pendingVote.toString());
   
-  push(ref(db, `votes/${cur}`), {
+  set(ref(db, `votes/${cur}/${uid}`), {
     optIndex: pendingVote,
     timestamp: Date.now()
   });
@@ -550,6 +561,7 @@ function renderAdminPanel() {
         <button class="status ${isUnlocked?'status-unlocked':'status-locked'}" data-key="${d.key}">
           ${isUnlocked?'Liberado':'Bloqueado'}
         </button>
+        <button class="btn-clear" data-key="${d.key}">🗑️ Limpar</button>
       </div>`;
   }).join('');
 
@@ -572,6 +584,17 @@ function renderAdminPanel() {
       const key = e.target.getAttribute('data-key');
       const newVal = !locks[key];
       update(ref(db, 'locks'), { [key]: newVal });
+    });
+  });
+
+  document.querySelectorAll('.admin-day-row .btn-clear').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const key = e.target.getAttribute('data-key');
+      if (confirm(`Tem certeza que deseja apagar todos os votos de ${key.toUpperCase()}?`)) {
+        set(ref(db, `votes/${key}`), null).then(() => {
+          alert('Votos apagados com sucesso!');
+        });
+      }
     });
   });
 }
